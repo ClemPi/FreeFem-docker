@@ -1,15 +1,67 @@
-FROM ubuntu
+FROM ubuntu AS builder
 
 MAINTAINER Simon Garnotel "simon.garnotel@gmail.com"
 
-# Update aptitude
-RUN apt-get update
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+	autoconf \
+	automake \
+	autotools-dev \
+	bison \
+	cmake \
+	coinor-libipopt-dev \
+	cpp \
+	flex \
+	g++ \
+	gcc \
+	gdb \
+	gfortran \
+	ghostscript \
+	git \
+	m4 \
+	make \
+	libopenblas-dev \
+	liblapack-dev \
+	libhdf5-dev \
+	libgsl-dev \
+	libscotch-dev \
+	libfftw3-dev \
+	libarpack2-dev \
+	libsuitesparse-dev \
+	libmumps-seq-dev \
+	libnlopt-dev \
+	libgmm++-dev \
+	libtet1.5-dev \
+	libopenmpi-dev \
+	patch \
+	pkg-config \
+	python \
+	unzip \
+	valgrind \
+	wget \
+	&& rm -rf /var/lib/apt/lists/*
 
-# Upgrade
-RUN apt-get upgrade -y && apt-get clean
+# Copy ff++ repository
+RUN git clone https://github.com/FreeFem/FreeFem-sources.git /root/FreeFem++-source
+
+# Compile FreeFem++
+RUN cd /root/FreeFem++-source \
+	&& autoreconf -i \
+	&& ./configure --enable-download --enable-optim --prefix=/usr/freefem/ \
+	&& ./3rdparty/getall -a \
+	&& cd 3rdparty/ff-petsc \
+	&& make petsc-slepc \
+	&& cd - \
+	&& ./reconfigure \
+	&& make -j 4 \
+	&& make install
+
+FROM ubuntu 
+
+MAINTAINER Simon Garnotel "simon.garnotel@gmail.com"
 
 # Install dependencies
-RUN apt-get install -y \
+RUN apt-get update && apt-get install -y \
 	coinor-libipopt-dev \
 	libopenblas-dev \
 	liblapack-dev \
@@ -23,11 +75,12 @@ RUN apt-get install -y \
 	libnlopt-dev \
 	libgmm++-dev \
 	libtet1.5-dev \
-	libopenmpi-dev
+	libopenmpi-dev \
+	&& rm -rf /var/lib/apt/lists/*
 
 # Copy ff repository
 RUN mkdir /usr/freefem
-ADD ff++-compiled /usr/freefem
+COPY --from=builder  /usr/freefem /usr/freefem
 
 # Add FreeFem++ to bashrc
 RUN touch /root/.bash_aliases \
